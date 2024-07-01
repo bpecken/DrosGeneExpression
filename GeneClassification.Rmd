@@ -1,0 +1,817 @@
+---
+title: "Gene Classification (adjusted from MG)"
+author: "Brooke Peckenpaugh"
+date: "6 Dec 2021"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+setwd("~/Desktop/data/aim_3")
+
+library(tidyverse)
+```
+
+
+### Functions
+```{r}
+classify_expressed <- function(row, names, cutoff){
+  #Checks if gene is expressed greater than [cutoff] in at least 1 of the tissues included in  names.
+  #Returns boolean
+  
+  row <- row[which(names(row) %in% names)]
+  for(i in seq(1, length(names))){
+    if (as.numeric(row[i]) > cutoff){
+      return(TRUE)
+    }
+  }
+  return(FALSE)
+}
+
+classify_trace <- function(row, names, cutoff){
+  #Checks if gene is expressed less than [cutoff] in ALL of the tissues included in names.
+  #Returns boolean
+  
+  num_trace <-  0
+  
+  row <- row[which(names(row) %in% names)]
+  for(i in seq(1, length(names))){
+    if (as.numeric(row[i]) < cutoff){
+      num_trace <- num_trace + 1
+    }
+  }
+  if  (num_trace == length(names)){
+    return(TRUE)
+  }else{return(FALSE)}
+  
+}
+
+#calculate tau measure of tissue specificity
+#https://github.com/severinEvo/gene_expression
+tau<-function(x){
+  if(any(is.na(x))) stop('NA\'s need to be 0.')
+  if(any(x<0)) stop('Negative input values not permitted.')
+  t<-sum(1-x/max(x))/(length(x)-1)
+}
+
+```
+
+
+# Load  data
+## melanogaster (ore)
+```{r}
+mel <- read.table("~/Desktop/data/aim_3/dmel.transTPM.txt", header = T)
+
+mel_FB <- read.table("~/Desktop/data/aim_3/GSE99574_HiSAT2_dmel.transcript_level_TPM.FB.txt", header = T)
+
+mel_ore_f_full <- mel %>% select(1, 3, starts_with("oreR_f"))
+
+mel_ore_f <- mel_ore_f_full %>% 
+  mutate(mean_head = rowMeans(select(mel_ore_f_full, contains("_hd_"))),
+        mean_thorax = rowMeans(select(mel_ore_f_full, contains("_tx_"))), 
+        mean_abdomen = rowMeans(select(mel_ore_f_full, contains("_ac_"))),
+        mean_digestive = rowMeans(select(mel_ore_f_full, contains("_dg_"))),
+        mean_gonad = rowMeans(select(mel_ore_f_full, contains("_go_"))),
+        mean_reproductive = rowMeans(select(mel_ore_f_full, contains("_re_"))),
+        mean_genitalia = rowMeans(select(mel_ore_f_full, contains("_ge_")))) %>%
+  select(1, 2, starts_with("mean"))
+
+
+mel_ore_m_full <- mel %>% select(1, 3, starts_with("oreR_m"))
+
+mel_ore_m <- mel_ore_m_full %>% 
+  mutate(mean_head = rowMeans(select(mel_ore_m_full, contains("_hd_"))),
+        mean_thorax = rowMeans(select(mel_ore_m_full, contains("_tx_"))), 
+        mean_abdomen = rowMeans(select(mel_ore_m_full, contains("_ac_"))),
+        mean_digestive = rowMeans(select(mel_ore_m_full, contains("_dg_"))),
+        mean_gonad = rowMeans(select(mel_ore_m_full, contains("_go_"))),
+        mean_reproductive = rowMeans(select(mel_ore_m_full, contains("_re_"))),
+        mean_genitalia = rowMeans(select(mel_ore_m_full, contains("_ge_")))) %>%
+  select(1, 2, starts_with("mean"))
+
+```
+
+## melanogaster (w1118)
+```{r}
+mel <- read.table("~/Desktop/data/aim_3/dmel.transTPM.txt", header = T)
+
+mel_w1118_f_full <- mel %>% select(1, starts_with("w1118_f"))
+
+mel_w1118_f <- mel_w1118_f_full %>% 
+  mutate(mean_head = rowMeans(select(mel_w1118_f_full, contains("_hd_"))),
+        mean_thorax = rowMeans(select(mel_w1118_f_full, contains("_tx_"))), 
+        mean_abdomen = rowMeans(select(mel_w1118_f_full, contains("_ac_"))),
+        mean_digestive = rowMeans(select(mel_w1118_f_full, contains("_dg_"))),
+        mean_gonad = rowMeans(select(mel_w1118_f_full, contains("_go_"))),
+        mean_reproductive = rowMeans(select(mel_w1118_f_full, contains("_re_"))),
+        mean_genitalia = rowMeans(select(mel_w1118_f_full, contains("_ge_")))) %>%
+  select(1, starts_with("mean"))
+
+
+mel_w1118_m_full <- mel %>% select(1, starts_with("w1118_m"))
+
+mel_w1118_m <- mel_w1118_m_full %>% 
+  mutate(mean_head = rowMeans(select(mel_w1118_m_full, contains("_hd_"))),
+        mean_thorax = rowMeans(select(mel_w1118_m_full, contains("_tx_"))), 
+        mean_abdomen = rowMeans(select(mel_w1118_m_full, contains("_ac_"))),
+        mean_digestive = rowMeans(select(mel_w1118_m_full, contains("_dg_"))),
+        mean_gonad = rowMeans(select(mel_w1118_m_full, contains("_go_"))),
+        mean_reproductive = rowMeans(select(mel_w1118_m_full, contains("_re_"))),
+        mean_genitalia = rowMeans(select(mel_w1118_m_full, contains("_ge_")))) %>%
+  select(1, starts_with("mean"))
+
+```
+
+## ananassae
+```{r}
+ana <- read.table("~/Desktop/data/aim_3/dana.transTPM.txt", header = T, fill = T)
+ana <- na.omit(ana)
+
+ana_f_full <- ana %>% select(1, starts_with("dana_f"))
+
+ana_f <- ana_f_full %>% 
+  mutate(mean_head = rowMeans(select(ana_f_full, contains("_hd_"))),
+        mean_thorax = rowMeans(select(ana_f_full, contains("_tx_"))), 
+        mean_abdomen = rowMeans(select(ana_f_full, contains("_ac_"))),
+        mean_digestive = rowMeans(select(ana_f_full, contains("_dg_"))),
+        mean_gonad = rowMeans(select(ana_f_full, contains("_go_"))),
+        mean_reproductive = rowMeans(select(ana_f_full, contains("_re_")))) %>%
+  select(1, starts_with("mean"))
+
+
+ana_m_full <- ana %>% select(1, starts_with("dana_m"))
+
+ana_m <- ana_m_full %>% 
+  mutate(mean_head = rowMeans(select(ana_m_full, contains("_hd_"))),
+        mean_thorax = rowMeans(select(ana_m_full, contains("_tx_"))), 
+        mean_abdomen = rowMeans(select(ana_m_full, contains("_ac_"))),
+        mean_digestive = rowMeans(select(ana_m_full, contains("_dg_"))),
+        mean_gonad = rowMeans(select(ana_m_full, contains("_go_"))),
+        mean_reproductive = rowMeans(select(ana_m_full, contains("_re_")))) %>%
+  select(1, starts_with("mean"))
+
+```
+
+## mojavensis
+```{r}
+moj <- read.table("~/Desktop/data/aim_3/dmoj.transTPM.txt", header = T, fill = T)
+moj <- na.omit(moj)
+
+moj_f_full <- moj %>% select(1, starts_with("dmoj_f"))
+
+moj_f <- moj_f_full %>% 
+  mutate(mean_head = rowMeans(select(moj_f_full, contains("_hd_"))),
+        mean_thorax = rowMeans(select(moj_f_full, contains("_tx_"))), 
+        mean_abdomen = rowMeans(select(moj_f_full, contains("_ac_"))),
+        mean_digestive = rowMeans(select(moj_f_full, contains("_dg_"))),
+        mean_gonad = rowMeans(select(moj_f_full, contains("_go_"))),
+        mean_reproductive = rowMeans(select(moj_f_full, contains("_re_")))) %>%
+  select(1, starts_with("mean"))
+
+
+moj_m_full <- moj %>% select(1, starts_with("dmoj_m"))
+
+moj_m <- moj_m_full %>% 
+  mutate(mean_head = rowMeans(select(moj_m_full, contains("_hd_"))),
+        mean_thorax = rowMeans(select(moj_m_full, contains("_tx_"))), 
+        mean_abdomen = rowMeans(select(moj_m_full, contains("_ac_"))),
+        mean_digestive = rowMeans(select(moj_m_full, contains("_dg_"))),
+        mean_gonad = rowMeans(select(moj_m_full, contains("_go_"))),
+        mean_reproductive = rowMeans(select(moj_m_full, contains("_re_")))) %>%
+  select(1, starts_with("mean"))
+
+```
+
+## persimilis
+```{r}
+per <- read.table("~/Desktop/data/aim_3/dper.transTPM.txt", header = T, fill = T)
+per <- na.omit(per)
+
+per_f_full <- per %>% select(1, starts_with("dper_f"))
+
+per_f <- per_f_full %>% 
+  mutate(mean_head = rowMeans(select(per_f_full, contains("_hd_"))),
+        mean_thorax = rowMeans(select(per_f_full, contains("_tx_"))), 
+        mean_abdomen = rowMeans(select(per_f_full, contains("_ac_"))),
+        mean_digestive = rowMeans(select(per_f_full, contains("_dg_"))),
+        mean_gonad = rowMeans(select(per_f_full, contains("_go_"))),
+        mean_reproductive = rowMeans(select(per_f_full, contains("_re_")))) %>%
+  select(1, starts_with("mean"))
+
+
+per_m_full <- per %>% select(1, starts_with("dper_m"))
+
+per_m <- per_m_full %>% 
+  mutate(mean_head = rowMeans(select(per_m_full, contains("_hd_"))),
+        mean_thorax = rowMeans(select(per_m_full, contains("_tx_"))), 
+        mean_abdomen = rowMeans(select(per_m_full, contains("_ac_"))),
+        mean_digestive = rowMeans(select(per_m_full, contains("_dg_"))),
+        mean_gonad = rowMeans(select(per_m_full, contains("_go_"))),
+        mean_reproductive = rowMeans(select(per_m_full, contains("_re_")))) %>%
+  select(1, starts_with("mean"))
+
+```
+
+## pseudoobscura
+```{r}
+pse <- read.table("~/Desktop/data/aim_3/dpse.transTPM.txt", header = T, fill = T)
+pse <- na.omit(pse)
+
+pse_f_full <- pse %>% select(1, starts_with("dpse_f"))
+
+pse_f <- pse_f_full %>% 
+  mutate(mean_head = rowMeans(select(pse_f_full, contains("_hd_"))),
+        mean_thorax = rowMeans(select(pse_f_full, contains("_tx_"))), 
+        mean_abdomen = rowMeans(select(pse_f_full, contains("_ac_"))),
+        mean_digestive = rowMeans(select(pse_f_full, contains("_dg_"))),
+        mean_gonad = rowMeans(select(pse_f_full, contains("_go_"))),
+        mean_reproductive = rowMeans(select(pse_f_full, contains("_re_")))) %>%
+  select(1, starts_with("mean"))
+
+
+pse_m_full <- pse %>% select(1, starts_with("dpse_m"))
+
+pse_m <- pse_m_full %>% 
+  mutate(mean_head = rowMeans(select(pse_m_full, contains("_hd_"))),
+        mean_thorax = rowMeans(select(pse_m_full, contains("_tx_"))), 
+        mean_abdomen = rowMeans(select(pse_m_full, contains("_ac_"))),
+        mean_digestive = rowMeans(select(pse_m_full, contains("_dg_"))),
+        mean_gonad = rowMeans(select(pse_m_full, contains("_go_"))),
+        mean_reproductive = rowMeans(select(pse_m_full, contains("_re_")))) %>%
+  select(1, starts_with("mean"))
+
+```
+
+## virilis
+```{r}
+vir <- read.table("~/Desktop/data/aim_3/dvir.transTPM.txt", header = T, fill = T)
+vir <- na.omit(vir)
+
+vir_f_full <- vir %>% select(1, starts_with("dvir_f"))
+
+vir_f <- vir_f_full %>% 
+  mutate(mean_head = rowMeans(select(vir_f_full, contains("_hd_"))),
+        mean_thorax = rowMeans(select(vir_f_full, contains("_tx_"))), 
+        mean_abdomen = rowMeans(select(vir_f_full, contains("_ac_"))),
+        mean_digestive = rowMeans(select(vir_f_full, contains("_dg_"))),
+        mean_gonad = rowMeans(select(vir_f_full, contains("_go_"))),
+        mean_reproductive = rowMeans(select(vir_f_full, contains("_re_")))) %>%
+  select(1, starts_with("mean"))
+
+
+vir_m_full <- vir %>% select(1, starts_with("dvir_m"))
+
+vir_m <- vir_m_full %>% 
+  mutate(mean_head = rowMeans(select(vir_m_full, contains("_hd_"))),
+        mean_thorax = rowMeans(select(vir_m_full, contains("_tx_"))), 
+        mean_abdomen = rowMeans(select(vir_m_full, contains("_ac_"))),
+        mean_digestive = rowMeans(select(vir_m_full, contains("_dg_"))),
+        mean_gonad = rowMeans(select(vir_m_full, contains("_go_"))),
+        mean_reproductive = rowMeans(select(vir_m_full, contains("_re_")))) %>%
+  select(1, starts_with("mean"))
+
+```
+
+## willistoni
+```{r}
+wil <- read.table("~/Desktop/data/aim_3/dwil.transTPM.txt", header = T, fill = T)
+wil <- na.omit(wil)
+
+wil_f_full <- wil %>% select(1, starts_with("dwil_f"))
+
+wil_f <- wil_f_full %>% 
+  mutate(mean_head = rowMeans(select(wil_f_full, contains("_hd_"))),
+        mean_thorax = rowMeans(select(wil_f_full, contains("_tx_"))), 
+        mean_abdomen = rowMeans(select(wil_f_full, contains("_ac_"))),
+        mean_digestive = rowMeans(select(wil_f_full, contains("_dg_"))),
+        mean_gonad = rowMeans(select(wil_f_full, contains("_go_"))),
+        mean_reproductive = rowMeans(select(wil_f_full, contains("_re_")))) %>%
+  select(1, starts_with("mean"))
+
+
+wil_m_full <- wil %>% select(1, starts_with("dwil_m"))
+
+wil_m <- wil_m_full %>% 
+  mutate(mean_head = rowMeans(select(wil_m_full, contains("_hd_"))),
+        mean_thorax = rowMeans(select(wil_m_full, contains("_tx_"))), 
+        mean_abdomen = rowMeans(select(wil_m_full, contains("_ac_"))),
+        mean_digestive = rowMeans(select(wil_m_full, contains("_dg_"))),
+        mean_gonad = rowMeans(select(wil_m_full, contains("_go_"))),
+        mean_reproductive = rowMeans(select(wil_m_full, contains("_re_")))) %>%
+  select(1, starts_with("mean"))
+
+```
+
+## yakuba
+```{r}
+yak <- read.table("~/Desktop/data/aim_3/dyak.transTPM.txt", header = T, fill = T)
+yak <- na.omit(yak)
+
+yak_f_full <- yak %>% select(1, starts_with("dyak_f"))
+
+yak_f <- yak_f_full %>% 
+  mutate(mean_head = rowMeans(select(yak_f_full, contains("_hd_"))),
+        mean_thorax = rowMeans(select(yak_f_full, contains("_tx_"))), 
+        mean_abdomen = rowMeans(select(yak_f_full, contains("_ac_"))),
+        mean_digestive = rowMeans(select(yak_f_full, contains("_dg_"))),
+        mean_gonad = rowMeans(select(yak_f_full, contains("_go_"))),
+        mean_reproductive = rowMeans(select(yak_f_full, contains("_re_")))) %>%
+  select(1, starts_with("mean"))
+
+
+yak_m_full <- yak %>% select(1, starts_with("dyak_m"))
+
+yak_m <- yak_m_full %>% 
+  mutate(mean_head = rowMeans(select(yak_m_full, contains("_hd_"))),
+        mean_thorax = rowMeans(select(yak_m_full, contains("_tx_"))), 
+        mean_abdomen = rowMeans(select(yak_m_full, contains("_ac_"))),
+        mean_digestive = rowMeans(select(yak_m_full, contains("_dg_"))),
+        mean_gonad = rowMeans(select(yak_m_full, contains("_go_"))),
+        mean_reproductive = rowMeans(select(yak_m_full, contains("_re_")))) %>%
+  select(1, starts_with("mean"))
+
+```
+
+## grimshawi
+```{r}
+haw <- read.table("~/Desktop/data/aim_3/haw.transTPM.txt", header = T, fill = T)
+haw <- na.omit(haw)
+
+gri_f_full <- haw %>% select(1, starts_with("dgriG1_f"))
+
+gri_f <- gri_f_full %>% 
+  mutate(mean_head = rowMeans(select(gri_f_full, contains("_hd_"))),
+        mean_thorax = rowMeans(select(gri_f_full, contains("_tx_"))), 
+        mean_abdomen = rowMeans(select(gri_f_full, contains("_ac_"))),
+        mean_digestive = rowMeans(select(gri_f_full, contains("_dg_"))),
+        mean_gonad = rowMeans(select(gri_f_full, contains("_go_"))),
+        mean_reproductive = rowMeans(select(gri_f_full, contains("_re_"))),
+        mean_genitalia = rowMeans(select(gri_f_full, contains("_ge_")))) %>%
+  select(1, starts_with("mean"))
+
+
+gri_m_full <- haw %>% select(1, starts_with("dgriG1_m"))
+
+gri_m <- gri_m_full %>% 
+  mutate(mean_head = rowMeans(select(gri_m_full, contains("_hd_"))),
+        mean_thorax = rowMeans(select(gri_m_full, contains("_tx_"))), 
+        mean_abdomen = rowMeans(select(gri_m_full, contains("_ac_"))),
+        mean_digestive = rowMeans(select(gri_m_full, contains("_dg_"))),
+        mean_gonad = rowMeans(select(gri_m_full, contains("_go_"))),
+        mean_reproductive = rowMeans(select(gri_m_full, contains("_re_"))),
+        mean_genitalia = rowMeans(select(gri_m_full, contains("_ge_")))) %>%
+  select(1, starts_with("mean"))
+
+```
+
+
+# Calculate Tau
+
+## mel (ore) female
+```{r}
+mel_ore_f_NA <- replace(mel_ore_f, mel_ore_f < 1, NA)
+mel_ore_f_NA_log <- log2(mel_ore_f_NA[,3:9])
+mel_ore_f_log <- replace(mel_ore_f_NA_log, is.na(mel_ore_f_NA_log), 0)
+
+mel_ore_f_log$tau <- apply(mel_ore_f_log, 1, tau)
+
+mel_ore_f_tau <- cbind(mel_ore_f[,1:2], mel_ore_f_log)
+
+#filter rows where reproductive tissues have highest gene expression
+mel_ore_f_RP <- mel_ore_f_tau %>% 
+  filter(mean_gonad > mean_head & mean_gonad > mean_thorax & mean_gonad > mean_abdomen & mean_gonad > mean_digestive |
+           mean_reproductive > mean_head & mean_reproductive > mean_thorax & mean_reproductive > mean_abdomen & mean_reproductive > mean_digestive |
+           mean_genitalia > mean_head & mean_genitalia > mean_thorax & mean_genitalia > mean_abdomen & mean_genitalia > mean_digestive)
+
+#filter tissue-specific, reproductive genes
+mel_ore_f_RPspec <- mel_ore_f_RP %>% filter(tau > 0.8)
+
+
+```
+
+## mel (ore) male
+```{r}
+mel_ore_m_NA <- replace(mel_ore_m, mel_ore_m < 1, NA)
+mel_ore_m_NA_log <- log2(mel_ore_m_NA[,3:9])
+mel_ore_m_log <- replace(mel_ore_m_NA_log, is.na(mel_ore_m_NA_log), 0)
+
+mel_ore_m_log$tau <- apply(mel_ore_m_log, 1, tau)
+
+mel_ore_m_tau <- cbind(mel_ore_m[,1:2], mel_ore_m_log)
+
+#filter rows where reproductive tissues have highest gene expression
+mel_ore_m_RP <- mel_ore_m_tau %>% 
+  filter(mean_gonad > mean_head & mean_gonad > mean_thorax & mean_gonad > mean_abdomen & mean_gonad > mean_digestive |
+           mean_reproductive > mean_head & mean_reproductive > mean_thorax & mean_reproductive > mean_abdomen & mean_reproductive > mean_digestive |
+           mean_genitalia > mean_head & mean_genitalia > mean_thorax & mean_genitalia > mean_abdomen & mean_genitalia > mean_digestive)
+
+#filter tissue-specific, reproductive genes
+mel_ore_m_RPspec <- mel_ore_m_RP %>% filter(tau > 0.8)
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# RP, SM, & GR
+
+## Classify
+
+### Overview of what I'm doing to classify genes:
+
+For each species...
+1. Identify SomExpressed genes (> 2 TPM in at least one somatic tissue; TRUE/FALSE)
+2. Identify RepExpressed genes (> 2 TPM in at least one reproductive tissue; TRUE/FALSE)
+3. Identify somatic trace expression genes (< 0.5 TPM in all som tissues; TRUE/FALSE)
+4. Identify reproductive trace expression genes (< 0.5 TPM in all rep tissues; TRUE/FALSE)
+
+5. Classify GR genes as those which are SomExpressed AND RepExpressed AND not expressed at trace levels in either (TRUE/FALSE)
+6. Classify SM genes as those which are SomExpressed AND trace expressed in reproductive tissues AND not in the GR list (TRUE/FALSE)
+7. Classify RP genes as those which are RepExpressed AND trace expressed in somatic tissues AND not in the GR list (TRUE/FALSE)
+
+
+## MELANOGASTER
+
+```{r}
+upperCutoff <- 2
+lowerCutoff <- 0.5
+
+```
+
+### mel (ore) female
+```{r}
+mel_ore_f <- mel_ore_f %>% mutate(SomExpressed = apply(mel_ore_f, 1, classify_expressed, names = c("mean_head", "mean_thorax", "mean_abdomen",  "mean_digestive"), upperCutoff),
+                      RepExpressed = apply(mel_ore_f, 1, classify_expressed, names = c("mean_gonad", "mean_reproductive", "mean_genitalia"), upperCutoff),
+                      SomTrace = apply(mel_ore_f, 1, classify_trace, names = c("mean_head", "mean_thorax", "mean_abdomen",  "mean_digestive"), lowerCutoff),
+                      RepTrace = apply(mel_ore_f, 1, classify_trace, names = c("mean_gonad", "mean_reproductive", "mean_genitalia"), lowerCutoff)) %>%
+  mutate(GR = SomExpressed & RepExpressed & !SomTrace & !RepTrace,
+         SM = SomExpressed & RepTrace & !GR,
+         RP = RepExpressed & SomTrace & !GR)
+
+
+mel_ore_f_RP <- mel_ore_f %>% filter(RP == TRUE)
+mel_ore_f_SM <- mel_ore_f %>% filter(SM == TRUE)
+mel_ore_f_GR <- mel_ore_f %>% filter(GR == TRUE)
+
+```
+
+### mel (ore) male
+```{r}
+mel_ore_m <- mel_ore_m %>% mutate(SomExpressed = apply(mel_ore_m, 1, classify_expressed, names = c("mean_head", "mean_thorax", "mean_abdomen",  "mean_digestive"), upperCutoff),
+                      RepExpressed = apply(mel_ore_m, 1, classify_expressed, names = c("mean_gonad", "mean_reproductive", "mean_genitalia"), upperCutoff),
+                      SomTrace = apply(mel_ore_m, 1, classify_trace, names = c("mean_head", "mean_thorax", "mean_abdomen",  "mean_digestive"), lowerCutoff),
+                      RepTrace = apply(mel_ore_m, 1, classify_trace, names = c("mean_gonad", "mean_reproductive", "mean_genitalia"), lowerCutoff)) %>%
+  mutate(GR = SomExpressed & RepExpressed & !SomTrace & !RepTrace,
+         SM = SomExpressed & RepTrace & !GR,
+         RP = RepExpressed & SomTrace & !GR)
+
+
+mel_ore_m_RP <- mel_ore_m %>% filter(RP == TRUE)
+mel_ore_m_SM <- mel_ore_m %>% filter(SM == TRUE)
+mel_ore_m_GR <- mel_ore_m %>% filter(GR == TRUE)
+
+```
+
+### mel (w1118) female
+```{r}
+mel_w1118_f <- mel_w1118_f %>% mutate(SomExpressed = apply(mel_w1118_f, 1, classify_expressed, names = c("mean_head", "mean_thorax", "mean_abdomen",  "mean_digestive"), upperCutoff),
+                      RepExpressed = apply(mel_w1118_f, 1, classify_expressed, names = c("mean_gonad", "mean_reproductive", "mean_genitalia"), upperCutoff),
+                      SomTrace = apply(mel_w1118_f, 1, classify_trace, names = c("mean_head", "mean_thorax", "mean_abdomen",  "mean_digestive"), lowerCutoff),
+                      RepTrace = apply(mel_w1118_f, 1, classify_trace, names = c("mean_gonad", "mean_reproductive", "mean_genitalia"), lowerCutoff)) %>%
+  mutate(GR = SomExpressed & RepExpressed & !SomTrace & !RepTrace,
+         SM = SomExpressed & RepTrace & !GR,
+         RP = RepExpressed & SomTrace & !GR)
+
+
+mel_w1118_f_RP <- mel_w1118_f %>% filter(RP == TRUE)
+mel_w1118_f_SM <- mel_w1118_f %>% filter(SM == TRUE)
+mel_w1118_f_GR <- mel_w1118_f %>% filter(GR == TRUE)
+
+```
+
+### mel (w1118) male
+```{r}
+mel_w1118_m <- mel_w1118_m %>% mutate(SomExpressed = apply(mel_w1118_m, 1, classify_expressed, names = c("mean_head", "mean_thorax", "mean_abdomen",  "mean_digestive"), upperCutoff),
+                      RepExpressed = apply(mel_w1118_m, 1, classify_expressed, names = c("mean_gonad", "mean_reproductive", "mean_genitalia"), upperCutoff),
+                      SomTrace = apply(mel_w1118_m, 1, classify_trace, names = c("mean_head", "mean_thorax", "mean_abdomen",  "mean_digestive"), lowerCutoff),
+                      RepTrace = apply(mel_w1118_m, 1, classify_trace, names = c("mean_gonad", "mean_reproductive", "mean_genitalia"), lowerCutoff)) %>%
+  mutate(GR = SomExpressed & RepExpressed & !SomTrace & !RepTrace,
+         SM = SomExpressed & RepTrace & !GR,
+         RP = RepExpressed & SomTrace & !GR)
+
+
+mel_w1118_m_RP <- mel_w1118_m %>% filter(RP == TRUE)
+mel_w1118_m_SM <- mel_w1118_m %>% filter(SM == TRUE)
+mel_w1118_m_GR <- mel_w1118_m %>% filter(GR == TRUE)
+
+```
+
+
+## ANANASSAE
+
+### ana female
+```{r}
+ana_f <- ana_f %>% mutate(SomExpressed = apply(ana_f, 1, classify_expressed, names = c("mean_head", "mean_thorax", "mean_abdomen", "mean_digestive"), upperCutoff),
+                      RepExpressed = apply(ana_f, 1, classify_expressed, names = c("mean_gonad", "mean_reproductive"), upperCutoff),
+                      SomTrace = apply(ana_f, 1, classify_trace, names = c("mean_head", "mean_thorax", "mean_abdomen",  "mean_digestive"), lowerCutoff),
+                      RepTrace = apply(ana_f, 1, classify_trace, names = c("mean_gonad", "mean_reproductive"), lowerCutoff)) %>%
+  mutate(GR = SomExpressed & RepExpressed & !SomTrace & !RepTrace,
+         SM = SomExpressed & RepTrace & !GR,
+         RP = RepExpressed & SomTrace & !GR)
+
+
+ana_f_RP <- ana_f %>% filter(RP == TRUE)
+ana_f_SM <- ana_f %>% filter(SM == TRUE)
+ana_f_GR <- ana_f %>% filter(GR == TRUE)
+
+```
+
+### ana male
+```{r}
+ana_m <- ana_m %>% mutate(SomExpressed = apply(ana_m, 1, classify_expressed, names = c("mean_head", "mean_thorax", "mean_abdomen",  "mean_digestive"), upperCutoff),
+                      RepExpressed = apply(ana_m, 1, classify_expressed, names = c("mean_gonad", "mean_reproductive"), upperCutoff),
+                      SomTrace = apply(ana_m, 1, classify_trace, names = c("mean_head", "mean_thorax", "mean_abdomen",  "mean_digestive"), lowerCutoff),
+                      RepTrace = apply(ana_m, 1, classify_trace, names = c("mean_gonad", "mean_reproductive"), lowerCutoff)) %>%
+  mutate(GR = SomExpressed & RepExpressed & !SomTrace & !RepTrace,
+         SM = SomExpressed & RepTrace & !GR,
+         RP = RepExpressed & SomTrace & !GR)
+
+
+ana_m_RP <- ana_m %>% filter(RP == TRUE)
+ana_m_SM <- ana_m %>% filter(SM == TRUE)
+ana_m_GR <- ana_m %>% filter(GR == TRUE)
+
+```
+
+
+## MOJAVENSIS
+
+### moj female
+```{r}
+moj_f <- moj_f %>% mutate(SomExpressed = apply(moj_f, 1, classify_expressed, names = c("mean_head", "mean_thorax", "mean_abdomen",  "mean_digestive"), upperCutoff),
+                      RepExpressed = apply(moj_f, 1, classify_expressed, names = c("mean_gonad", "mean_reproductive"), upperCutoff),
+                      SomTrace = apply(moj_f, 1, classify_trace, names = c("mean_head", "mean_thorax", "mean_abdomen",  "mean_digestive"), lowerCutoff),
+                      RepTrace = apply(moj_f, 1, classify_trace, names = c("mean_gonad", "mean_reproductive"), lowerCutoff)) %>%
+  mutate(GR = SomExpressed & RepExpressed & !SomTrace & !RepTrace,
+         SM = SomExpressed & RepTrace & !GR,
+         RP = RepExpressed & SomTrace & !GR)
+
+
+moj_f_RP <- moj_f %>% filter(RP == TRUE)
+moj_f_SM <- moj_f %>% filter(SM == TRUE)
+moj_f_GR <- moj_f %>% filter(GR == TRUE)
+
+```
+
+### moj male
+```{r}
+moj_m <- moj_m %>% mutate(SomExpressed = apply(moj_m, 1, classify_expressed, names = c("mean_head", "mean_thorax", "mean_abdomen",  "mean_digestive"), upperCutoff),
+                      RepExpressed = apply(moj_m, 1, classify_expressed, names = c("mean_gonad", "mean_reproductive"), upperCutoff),
+                      SomTrace = apply(moj_m, 1, classify_trace, names = c("mean_head", "mean_thorax", "mean_abdomen",  "mean_digestive"), lowerCutoff),
+                      RepTrace = apply(moj_m, 1, classify_trace, names = c("mean_gonad", "mean_reproductive"), lowerCutoff)) %>%
+  mutate(GR = SomExpressed & RepExpressed & !SomTrace & !RepTrace,
+         SM = SomExpressed & RepTrace & !GR,
+         RP = RepExpressed & SomTrace & !GR)
+
+
+moj_m_RP <- moj_m %>% filter(RP == TRUE)
+moj_m_SM <- moj_m %>% filter(SM == TRUE)
+moj_m_GR <- moj_m %>% filter(GR == TRUE)
+
+```
+
+
+## PERSIMILIS
+
+### per female
+```{r}
+per_f <- per_f %>% mutate(SomExpressed = apply(per_f, 1, classify_expressed, names = c("mean_head", "mean_thorax", "mean_abdomen",  "mean_digestive"), upperCutoff),
+                      RepExpressed = apply(per_f, 1, classify_expressed, names = c("mean_gonad", "mean_reproductive"), upperCutoff),
+                      SomTrace = apply(per_f, 1, classify_trace, names = c("mean_head", "mean_thorax", "mean_abdomen",  "mean_digestive"), lowerCutoff),
+                      RepTrace = apply(per_f, 1, classify_trace, names = c("mean_gonad", "mean_reproductive"), lowerCutoff)) %>%
+  mutate(GR = SomExpressed & RepExpressed & !SomTrace & !RepTrace,
+         SM = SomExpressed & RepTrace & !GR,
+         RP = RepExpressed & SomTrace & !GR)
+
+
+per_f_RP <- per_f %>% filter(RP == TRUE)
+per_f_SM <- per_f %>% filter(SM == TRUE)
+per_f_GR <- per_f %>% filter(GR == TRUE)
+
+```
+
+### per male
+```{r}
+per_m <- per_m %>% mutate(SomExpressed = apply(per_m, 1, classify_expressed, names = c("mean_head", "mean_thorax", "mean_abdomen",  "mean_digestive"), upperCutoff),
+                      RepExpressed = apply(per_m, 1, classify_expressed, names = c("mean_gonad", "mean_reproductive"), upperCutoff),
+                      SomTrace = apply(per_m, 1, classify_trace, names = c("mean_head", "mean_thorax", "mean_abdomen",  "mean_digestive"), lowerCutoff),
+                      RepTrace = apply(per_m, 1, classify_trace, names = c("mean_gonad", "mean_reproductive"), lowerCutoff)) %>%
+  mutate(GR = SomExpressed & RepExpressed & !SomTrace & !RepTrace,
+         SM = SomExpressed & RepTrace & !GR,
+         RP = RepExpressed & SomTrace & !GR)
+
+
+per_m_RP <- per_m %>% filter(RP == TRUE)
+per_m_SM <- per_m %>% filter(SM == TRUE)
+per_m_GR <- per_m %>% filter(GR == TRUE)
+
+```
+
+
+## PSEUDOOBSCURA
+
+### pse female
+```{r}
+pse_f <- pse_f %>% mutate(SomExpressed = apply(pse_f, 1, classify_expressed, names = c("mean_head", "mean_thorax", "mean_abdomen",  "mean_digestive"), upperCutoff),
+                      RepExpressed = apply(pse_f, 1, classify_expressed, names = c("mean_gonad", "mean_reproductive"), upperCutoff),
+                      SomTrace = apply(pse_f, 1, classify_trace, names = c("mean_head", "mean_thorax", "mean_abdomen",  "mean_digestive"), lowerCutoff),
+                      RepTrace = apply(pse_f, 1, classify_trace, names = c("mean_gonad", "mean_reproductive"), lowerCutoff)) %>%
+  mutate(GR = SomExpressed & RepExpressed & !SomTrace & !RepTrace,
+         SM = SomExpressed & RepTrace & !GR,
+         RP = RepExpressed & SomTrace & !GR)
+
+
+pse_f_RP <- pse_f %>% filter(RP == TRUE)
+pse_f_SM <- pse_f %>% filter(SM == TRUE)
+pse_f_GR <- pse_f %>% filter(GR == TRUE)
+
+```
+
+### pse male
+```{r}
+pse_m <- pse_m %>% mutate(SomExpressed = apply(pse_m, 1, classify_expressed, names = c("mean_head", "mean_thorax", "mean_abdomen",  "mean_digestive"), upperCutoff),
+                      RepExpressed = apply(pse_m, 1, classify_expressed, names = c("mean_gonad", "mean_reproductive"), upperCutoff),
+                      SomTrace = apply(pse_m, 1, classify_trace, names = c("mean_head", "mean_thorax", "mean_abdomen",  "mean_digestive"), lowerCutoff),
+                      RepTrace = apply(pse_m, 1, classify_trace, names = c("mean_gonad", "mean_reproductive"), lowerCutoff)) %>%
+  mutate(GR = SomExpressed & RepExpressed & !SomTrace & !RepTrace,
+         SM = SomExpressed & RepTrace & !GR,
+         RP = RepExpressed & SomTrace & !GR)
+
+
+pse_m_RP <- pse_m %>% filter(RP == TRUE)
+pse_m_SM <- pse_m %>% filter(SM == TRUE)
+pse_m_GR <- pse_m %>% filter(GR == TRUE)
+
+```
+
+
+## VIRILIS
+
+### vir female
+```{r}
+vir_f <- vir_f %>% mutate(SomExpressed = apply(vir_f, 1, classify_expressed, names = c("mean_head", "mean_thorax", "mean_abdomen",  "mean_digestive"), upperCutoff),
+                      RepExpressed = apply(vir_f, 1, classify_expressed, names = c("mean_gonad", "mean_reproductive"), upperCutoff),
+                      SomTrace = apply(vir_f, 1, classify_trace, names = c("mean_head", "mean_thorax", "mean_abdomen",  "mean_digestive"), lowerCutoff),
+                      RepTrace = apply(vir_f, 1, classify_trace, names = c("mean_gonad", "mean_reproductive"), lowerCutoff)) %>%
+  mutate(GR = SomExpressed & RepExpressed & !SomTrace & !RepTrace,
+         SM = SomExpressed & RepTrace & !GR,
+         RP = RepExpressed & SomTrace & !GR)
+
+
+vir_f_RP <- vir_f %>% filter(RP == TRUE)
+vir_f_SM <- vir_f %>% filter(SM == TRUE)
+vir_f_GR <- vir_f %>% filter(GR == TRUE)
+
+```
+
+### vir male
+```{r}
+vir_m <- vir_m %>% mutate(SomExpressed = apply(vir_m, 1, classify_expressed, names = c("mean_head", "mean_thorax", "mean_abdomen",  "mean_digestive"), upperCutoff),
+                      RepExpressed = apply(vir_m, 1, classify_expressed, names = c("mean_gonad", "mean_reproductive"), upperCutoff),
+                      SomTrace = apply(vir_m, 1, classify_trace, names = c("mean_head", "mean_thorax", "mean_abdomen",  "mean_digestive"), lowerCutoff),
+                      RepTrace = apply(vir_m, 1, classify_trace, names = c("mean_gonad", "mean_reproductive"), lowerCutoff)) %>%
+  mutate(GR = SomExpressed & RepExpressed & !SomTrace & !RepTrace,
+         SM = SomExpressed & RepTrace & !GR,
+         RP = RepExpressed & SomTrace & !GR)
+
+
+vir_m_RP <- vir_m %>% filter(RP == TRUE)
+vir_m_SM <- vir_m %>% filter(SM == TRUE)
+vir_m_GR <- vir_m %>% filter(GR == TRUE)
+
+```
+
+
+## WILLISTONI
+
+### wil female
+```{r}
+wil_f <- wil_f %>% mutate(SomExpressed = apply(wil_f, 1, classify_expressed, names = c("mean_head", "mean_thorax", "mean_abdomen",  "mean_digestive"), upperCutoff),
+                      RepExpressed = apply(wil_f, 1, classify_expressed, names = c("mean_gonad", "mean_reproductive"), upperCutoff),
+                      SomTrace = apply(wil_f, 1, classify_trace, names = c("mean_head", "mean_thorax", "mean_abdomen",  "mean_digestive"), lowerCutoff),
+                      RepTrace = apply(wil_f, 1, classify_trace, names = c("mean_gonad", "mean_reproductive"), lowerCutoff)) %>%
+  mutate(GR = SomExpressed & RepExpressed & !SomTrace & !RepTrace,
+         SM = SomExpressed & RepTrace & !GR,
+         RP = RepExpressed & SomTrace & !GR)
+
+
+wil_f_RP <- wil_f %>% filter(RP == TRUE)
+wil_f_SM <- wil_f %>% filter(SM == TRUE)
+wil_f_GR <- wil_f %>% filter(GR == TRUE)
+
+```
+
+### wil male
+```{r}
+wil_m <- wil_m %>% mutate(SomExpressed = apply(wil_m, 1, classify_expressed, names = c("mean_head", "mean_thorax", "mean_abdomen",  "mean_digestive"), upperCutoff),
+                      RepExpressed = apply(wil_m, 1, classify_expressed, names = c("mean_gonad", "mean_reproductive"), upperCutoff),
+                      SomTrace = apply(wil_m, 1, classify_trace, names = c("mean_head", "mean_thorax", "mean_abdomen",  "mean_digestive"), lowerCutoff),
+                      RepTrace = apply(wil_m, 1, classify_trace, names = c("mean_gonad", "mean_reproductive"), lowerCutoff)) %>%
+  mutate(GR = SomExpressed & RepExpressed & !SomTrace & !RepTrace,
+         SM = SomExpressed & RepTrace & !GR,
+         RP = RepExpressed & SomTrace & !GR)
+
+
+wil_m_RP <- wil_m %>% filter(RP == TRUE)
+wil_m_SM <- wil_m %>% filter(SM == TRUE)
+wil_m_GR <- wil_m %>% filter(GR == TRUE)
+
+```
+
+
+## YAKUBA
+
+### yak female
+```{r}
+yak_f <- yak_f %>% mutate(SomExpressed = apply(yak_f, 1, classify_expressed, names = c("mean_head", "mean_thorax", "mean_abdomen",  "mean_digestive"), upperCutoff),
+                      RepExpressed = apply(yak_f, 1, classify_expressed, names = c("mean_gonad", "mean_reproductive"), upperCutoff),
+                      SomTrace = apply(yak_f, 1, classify_trace, names = c("mean_head", "mean_thorax", "mean_abdomen",  "mean_digestive"), lowerCutoff),
+                      RepTrace = apply(yak_f, 1, classify_trace, names = c("mean_gonad", "mean_reproductive"), lowerCutoff)) %>%
+  mutate(GR = SomExpressed & RepExpressed & !SomTrace & !RepTrace,
+         SM = SomExpressed & RepTrace & !GR,
+         RP = RepExpressed & SomTrace & !GR)
+
+
+yak_f_RP <- yak_f %>% filter(RP == TRUE)
+yak_f_SM <- yak_f %>% filter(SM == TRUE)
+yak_f_GR <- yak_f %>% filter(GR == TRUE)
+
+```
+
+### yak male
+```{r}
+yak_m <- yak_m %>% mutate(SomExpressed = apply(yak_m, 1, classify_expressed, names = c("mean_head", "mean_thorax", "mean_abdomen",  "mean_digestive"), upperCutoff),
+                      RepExpressed = apply(yak_m, 1, classify_expressed, names = c("mean_gonad", "mean_reproductive"), upperCutoff),
+                      SomTrace = apply(yak_m, 1, classify_trace, names = c("mean_head", "mean_thorax", "mean_abdomen",  "mean_digestive"), lowerCutoff),
+                      RepTrace = apply(yak_m, 1, classify_trace, names = c("mean_gonad", "mean_reproductive"), lowerCutoff)) %>%
+  mutate(GR = SomExpressed & RepExpressed & !SomTrace & !RepTrace,
+         SM = SomExpressed & RepTrace & !GR,
+         RP = RepExpressed & SomTrace & !GR)
+
+
+yak_m_RP <- yak_m %>% filter(RP == TRUE)
+yak_m_SM <- yak_m %>% filter(SM == TRUE)
+yak_m_GR <- yak_m %>% filter(GR == TRUE)
+
+```
+
+
+## GRIMSHAWI
+
+### gri female
+```{r}
+gri_f <- gri_f %>% mutate(SomExpressed = apply(gri_f, 1, classify_expressed, names = c("mean_head", "mean_thorax", "mean_abdomen",  "mean_digestive"), upperCutoff),
+                      RepExpressed = apply(gri_f, 1, classify_expressed, names = c("mean_gonad", "mean_reproductive", "mean_genitalia"), upperCutoff),
+                      SomTrace = apply(gri_f, 1, classify_trace, names = c("mean_head", "mean_thorax", "mean_abdomen",  "mean_digestive"), lowerCutoff),
+                      RepTrace = apply(gri_f, 1, classify_trace, names = c("mean_gonad", "mean_reproductive", "mean_genitalia"), lowerCutoff)) %>%
+  mutate(GR = SomExpressed & RepExpressed & !SomTrace & !RepTrace,
+         SM = SomExpressed & RepTrace & !GR,
+         RP = RepExpressed & SomTrace & !GR)
+
+
+gri_f_RP <- gri_f %>% filter(RP == TRUE)
+gri_f_SM <- gri_f %>% filter(SM == TRUE)
+gri_f_GR <- gri_f %>% filter(GR == TRUE)
+
+```
+
+### gri male
+```{r}
+gri_m <- gri_m %>% mutate(SomExpressed = apply(gri_m, 1, classify_expressed, names = c("mean_head", "mean_thorax", "mean_abdomen",  "mean_digestive"), upperCutoff),
+                      RepExpressed = apply(gri_m, 1, classify_expressed, names = c("mean_gonad", "mean_reproductive", "mean_genitalia"), upperCutoff),
+                      SomTrace = apply(gri_m, 1, classify_trace, names = c("mean_head", "mean_thorax", "mean_abdomen",  "mean_digestive"), lowerCutoff),
+                      RepTrace = apply(gri_m, 1, classify_trace, names = c("mean_gonad", "mean_reproductive", "mean_genitalia"), lowerCutoff)) %>%
+  mutate(GR = SomExpressed & RepExpressed & !SomTrace & !RepTrace,
+         SM = SomExpressed & RepTrace & !GR,
+         RP = RepExpressed & SomTrace & !GR)
+
+
+gri_m_RP <- gri_m %>% filter(RP == TRUE)
+gri_m_SM <- gri_m %>% filter(SM == TRUE)
+gri_m_GR <- gri_m %>% filter(GR == TRUE)
+
+```
