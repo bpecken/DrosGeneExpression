@@ -8,8 +8,7 @@ The data included transcriptome data for 2 lines of <i>D. melanogaster</i> and 8
 
 Yang H, Jaime M, Polihronakis M, Kanegawa K, Markow T, Kaneshiro K, Oliver B. Re-annotation of eight Drosophila genomes. Life Sci Alliance. 2018 Dec 24;1(6):e201800156. doi: 10.26508/lsa.201800156. PMID: 30599046; PMCID: PMC6305970.
 
-Links to access data: https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE99574
-https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE80124
+Links to access data: https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE99574, https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE80124
 
 
 ## Scripts
